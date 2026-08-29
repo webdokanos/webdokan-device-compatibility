@@ -55,7 +55,7 @@ class WebDokan_Compat_Admin {
         <div class="options_group show_if_simple show_if_variable" style="border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 12px;">
             <p class="form-field _webdokan_wdp_id_field">
                 <label for="_webdokan_wdp_id">
-                    <strong><?php esc_html_e('WebDokan Product ID (WDP ID)', 'webdokan-device-compatibility'); ?></strong>
+                    <strong><?php esc_html_e('WebDokan Product ID (WDP ID)', 'webdokan-device-compatibility-fit-for-woocommerce'); ?></strong>
                 </label>
                 <span class="wrap" style="display: flex; gap: 8px; align-items: center;">
                     <input type="text" 
@@ -66,14 +66,14 @@ class WebDokan_Compat_Admin {
                            value="<?php echo esc_attr($wdp_id); ?>" 
                            placeholder="e.g. WDP90950" />
                     <button type="button" class="button button-secondary" id="webdokan-verify-btn">
-                        <?php esc_html_e('Verify WDP ID', 'webdokan-device-compatibility'); ?>
+                        <?php esc_html_e('Verify WDP ID', 'webdokan-device-compatibility-fit-for-woocommerce'); ?>
                     </button>
                 </span>
                 <span class="description" style="display: block; margin-top: 6px; font-size: 12px; color: #64748b;">
                     <?php if (empty($api_key)): ?>
                         <span style="color: #b91c1c; font-weight: 600;">⚠️ API Key required: Please enter your WebDokan API Key in <a href="<?php echo esc_url(admin_url('admin.php?page=webdokan')); ?>">WebDokan Hub</a> to activate verification.</span>
                     <?php else: ?>
-                        <?php esc_html_e('Enter certified WebDokan ID (e.g. WDP90950) to render 100% verified compatibility badge on this product page. Leave blank to disable.', 'webdokan-device-compatibility'); ?>
+                        <?php esc_html_e('Enter certified WebDokan ID (e.g. WDP90950) to render 100% verified compatibility badge on this product page. Leave blank to disable.', 'webdokan-device-compatibility-fit-for-woocommerce'); ?>
                     <?php endif; ?>
                 </span>
             </p>
@@ -139,8 +139,8 @@ class WebDokan_Compat_Admin {
         // Unified single page under WooCommerce named "WebDokan"
         add_submenu_page(
             'woocommerce',
-            __('WebDokan Compatibility & Analytics', 'webdokan-device-compatibility'),
-            __('WebDokan', 'webdokan-device-compatibility'),
+            __('WebDokan Compatibility & Analytics', 'webdokan-device-compatibility-fit-for-woocommerce'),
+            __('WebDokan', 'webdokan-device-compatibility-fit-for-woocommerce'),
             'manage_woocommerce',
             'webdokan',
             array($this, 'render_unified_page')
@@ -148,11 +148,31 @@ class WebDokan_Compat_Admin {
     }
 
     public function register_settings() {
-        register_setting('webdokan_settings_group', 'webdokan_api_key');
-        register_setting('webdokan_settings_group', 'webdokan_api_url');
-        register_setting('webdokan_settings_group', 'webdokan_widget_position');
-        register_setting('webdokan_settings_group', 'webdokan_link_to_detail');
-        register_setting('webdokan_settings_group', 'webdokan_theme_mode');
+        register_setting('webdokan_settings_group', 'webdokan_api_key', array(
+            'type'              => 'string',
+            'sanitize_callback' => 'sanitize_text_field',
+            'default'           => ''
+        ));
+        register_setting('webdokan_settings_group', 'webdokan_api_url', array(
+            'type'              => 'string',
+            'sanitize_callback' => 'esc_url_raw',
+            'default'           => WEBDOKAN_DEFAULT_API_URL
+        ));
+        register_setting('webdokan_settings_group', 'webdokan_widget_position', array(
+            'type'              => 'string',
+            'sanitize_callback' => 'sanitize_text_field',
+            'default'           => 'woocommerce_before_add_to_cart_button'
+        ));
+        register_setting('webdokan_settings_group', 'webdokan_link_to_detail', array(
+            'type'              => 'string',
+            'sanitize_callback' => 'sanitize_text_field',
+            'default'           => 'yes'
+        ));
+        register_setting('webdokan_settings_group', 'webdokan_theme_mode', array(
+            'type'              => 'string',
+            'sanitize_callback' => 'sanitize_text_field',
+            'default'           => 'auto'
+        ));
     }
 
     public function render_unified_page() {

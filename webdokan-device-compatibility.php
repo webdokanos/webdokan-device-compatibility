@@ -7,12 +7,13 @@
  * Author: WebDokan
  * Author URI: https://webdokan.com
  * License: GPL-2.0+
- * Text Domain: webdokan-device-compatibility
+ * Text Domain: webdokan-device-compatibility-fit-for-woocommerce
  * Domain Path: /languages
  * Requires at least: 5.8
+ * Tested up to: 6.7
  * Requires PHP: 7.4
  * WC requires at least: 6.0
- * WC tested up to: 9.2
+ * WC tested up to: 9.4
  */
 
 if (!defined('ABSPATH')) {
@@ -63,7 +64,7 @@ class WebDokan_Device_Compatibility {
     }
 
     public function load_textdomain() {
-        load_plugin_textdomain('webdokan-device-compatibility', false, dirname(plugin_basename(__FILE__)) . '/languages');
+        load_plugin_textdomain('webdokan-device-compatibility-fit-for-woocommerce', false, dirname(plugin_basename(__FILE__)) . '/languages');
     }
 }
 
