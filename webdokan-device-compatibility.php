@@ -10,7 +10,7 @@
  * Text Domain: webdokan-device-compatibility-fit-for-woocommerce
  * Domain Path: /languages
  * Requires at least: 5.8
- * Tested up to: 6.7
+ * Tested up to: 7.1
  * Requires PHP: 7.4
  * WC requires at least: 6.0
  * WC tested up to: 9.4
