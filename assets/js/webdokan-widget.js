@@ -19,19 +19,8 @@
         };
 
         var localCatalog = Array.isArray(config.syncedDevices) ? config.syncedDevices : [];
-        var defaultWddId = 'WDD833335';
+        var defaultWddId = 'WDD2388';
         var defaultDeviceName = 'Apple iPhone 15 Pro';
-
-        // Detect user device from user agent
-        function detectVisitorBrandOrModel() {
-            var ua = navigator.userAgent || '';
-            if (/iPhone/i.test(ua)) return 'iPhone';
-            if (/SM-|Samsung|Galaxy/i.test(ua)) return 'Samsung';
-            if (/Pixel/i.test(ua)) return 'Pixel';
-            if (/Xiaomi|Redmi|POCO/i.test(ua)) return 'Redmi';
-            if (/OnePlus/i.test(ua)) return 'OnePlus';
-            return null;
-        }
 
         containers.forEach(function (container) {
             var wdpId = container.getAttribute('data-wdp-id') || '';
@@ -60,7 +49,7 @@
                         (config.apiKey ? '&api_key=' + encodeURIComponent(config.apiKey) : '') +
                         (config.siteDomain ? '&domain=' + encodeURIComponent(config.siteDomain) : '');
 
-                    iframe.style.opacity = '0.5';
+                    iframe.style.opacity = '0.4';
                     iframe.src = iframeUrl;
                     iframe.onload = function () {
                         iframe.style.opacity = '1';
@@ -68,50 +57,31 @@
                 }
             }
 
-            // Auto-detect visitor's phone model
-            var detectedKeyword = detectVisitorBrandOrModel();
-            if (detectedKeyword) {
-                if (localCatalog.length > 0) {
-                    var match = localCatalog.find(function (d) {
-                        var str = ((d.brand || '') + ' ' + (d.marketingName || d.model || '')).toLowerCase();
-                        return str.indexOf(detectedKeyword.toLowerCase()) !== -1;
-                    });
-                    if (match) {
-                        updateScoreIframe(match.wddId || ('WDD' + match.id), match.name || (match.brand + ' ' + match.model));
-                    }
-                } else {
-                    fetch(config.apiUrl + '/api/v1/compatibility/search-devices?q=' + encodeURIComponent(detectedKeyword))
-                        .then(function (res) { return res.json(); })
-                        .then(function (data) {
-                            if (data && data.devices && data.devices.length > 0) {
-                                var firstMatch = data.devices[0];
-                                updateScoreIframe(firstMatch.wddId || firstMatch.sku, firstMatch.name);
-                            }
-                        })
-                        .catch(function () {});
-                }
-            }
-
             // Search autocomplete handler
             function performSearch(query) {
-                var q = (query || '').toLowerCase().trim();
+                var q = (query || '').trim();
 
-                if (localCatalog.length > 0) {
-                    var filtered = [];
-                    if (!q) {
-                        filtered = localCatalog.slice(0, 12);
-                    } else {
-                        filtered = localCatalog.filter(function (d) {
-                            var str = ((d.brand || '') + ' ' + (d.marketingName || d.model || '') + ' ' + (d.wddId || '')).toLowerCase();
-                            return str.indexOf(q) !== -1;
-                        }).slice(0, 15);
-                    }
-                    renderSuggestions(filtered);
-                    return;
-                }
+                // 1. Try local WordPress AJAX search (fast local query from wp_options synced catalog)
+                var ajaxSearchUrl = (config.ajaxUrl || '/wp-admin/admin-ajax.php') + '?action=webdokan_search_devices&q=' + encodeURIComponent(q);
 
-                // Fallback to Cloud Search API
-                var searchUrl = config.apiUrl + '/api/v1/compatibility/search-devices?q=' + encodeURIComponent(query || '');
+                fetch(ajaxSearchUrl)
+                    .then(function (res) { return res.json(); })
+                    .then(function (data) {
+                        if (data && data.devices && data.devices.length > 0) {
+                            renderSuggestions(data.devices);
+                        } else {
+                            fallbackCloudSearch(q);
+                        }
+                    })
+                    .catch(function () {
+                        fallbackCloudSearch(q);
+                    });
+            }
+
+            function fallbackCloudSearch(query) {
+                var searchUrl = config.apiUrl + '/api/v1/compatibility/search-devices?q=' + encodeURIComponent(query || '') +
+                    (config.apiKey ? '&api_key=' + encodeURIComponent(config.apiKey) : '');
+
                 fetch(searchUrl)
                     .then(function (res) { return res.json(); })
                     .then(function (data) {
@@ -132,10 +102,12 @@
                 var html = '';
                 devices.forEach(function (d) {
                     var wdd = d.wddId || d.sku || ('WDD' + d.id);
-                    var displayName = d.name || ((d.brand || '') + ' ' + (d.marketingName || d.model || ''));
+                    var brand = d.brand || 'Phone';
+                    var displayName = d.name || d.marketingName || d.model || (brand + ' ' + (d.model || ''));
+                    
                     html += '<div class="webdokan-suggestion-item" data-wdd-id="' + wdd + '" data-device-name="' + displayName.trim() + '">' +
                         '<div class="webdokan-suggestion-info">' +
-                        '<span class="webdokan-suggestion-brand">' + (d.brand || 'Phone') + '</span>' +
+                        '<span class="webdokan-suggestion-brand">' + brand + '</span>' +
                         '<span class="webdokan-suggestion-name">' + displayName.trim() + '</span>' +
                         '</div>' +
                         '<span class="webdokan-suggestion-sku">' + wdd + '</span>' +

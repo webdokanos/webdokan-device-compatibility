@@ -3,7 +3,7 @@
  * Plugin Name: WebDokan Device Compatibility & Fit for WooCommerce
  * Plugin URI: https://webdokan.com/docs
  * Description: 100% verified hardware compatibility and fit scoring for smartphone chargers, cases, and accessories on WooCommerce. Powered by WebDokan Hardware Intelligence Cloud API.
- * Version: 1.0.0
+ * Version: 1.2.0
  * Author: WebDokan
  * Author URI: https://webdokan.com
  * License: GPL-2.0+
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 if (!defined('WEBDOKAN_COMPAT_VERSION')) {
-    define('WEBDOKAN_COMPAT_VERSION', '1.0.0');
+    define('WEBDOKAN_COMPAT_VERSION', '1.2.0');
 }
 if (!defined('WEBDOKAN_COMPAT_PLUGIN_FILE')) {
     define('WEBDOKAN_COMPAT_PLUGIN_FILE', __FILE__);
