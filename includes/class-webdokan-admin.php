@@ -21,6 +21,7 @@ class WebDokan_Compat_Admin {
         add_action('admin_menu', array($this, 'add_admin_pages'));
         add_action('admin_init', array($this, 'register_settings'));
         add_action('wp_ajax_webdokan_verify_wdp', array($this, 'ajax_verify_wdp'));
+        add_action('wp_ajax_webdokan_test_api_key', array($this, 'ajax_test_api_key'));
     }
 
     public function enqueue_admin_assets($hook) {
@@ -132,6 +133,55 @@ class WebDokan_Compat_Admin {
             wp_send_json_success($data);
         } else {
             wp_send_json_error(array('message' => $data['error'] ?? 'WDP ID not found in certified catalog.'));
+        }
+    }
+
+    public function ajax_test_api_key() {
+        check_ajax_referer('webdokan_admin_nonce', 'security');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(array('message' => 'Permission denied.'));
+        }
+
+        $api_key = sanitize_text_field($_POST['api_key'] ?? '');
+        $site_domain = parse_url(home_url(), PHP_URL_HOST);
+
+        if (empty($api_key)) {
+            wp_send_json_error(array('message' => 'Please paste or enter an API Key first.'));
+        }
+
+        $api_base = rtrim(get_option('webdokan_api_url', WEBDOKAN_DEFAULT_API_URL), '/');
+        $test_url = $api_base . '/api/v1/compatibility/analytics?domain=' . urlencode($site_domain) . '&api_key=' . urlencode($api_key);
+
+        $response = wp_remote_get($test_url, array(
+            'timeout' => 10,
+            'headers' => array(
+                'Accept' => 'application/json',
+                'X-WebDokan-Key' => $api_key
+            )
+        ));
+
+        if (is_wp_error($response)) {
+            wp_send_json_error(array(
+                'message' => 'Could not connect to WebDokan Cloud API: ' . $response->get_error_message()
+            ));
+        }
+
+        $status_code = wp_remote_retrieve_response_code($response);
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+
+        if ($status_code === 200 && !empty($body)) {
+            wp_send_json_success(array(
+                'message' => 'API Key is valid and active for domain "' . esc_html($site_domain) . '"!'
+            ));
+        } else if ($status_code === 403) {
+            wp_send_json_error(array(
+                'message' => $body['error'] ?? 'Your store domain (' . esc_html($site_domain) . ') is unauthorized or blocked by WebDokan administrator.'
+            ));
+        } else {
+            wp_send_json_error(array(
+                'message' => $body['error'] ?? 'Invalid WebDokan API Key. Please verify your key on WebDokan Partner Portal.'
+            ));
         }
     }
 
@@ -349,17 +399,21 @@ class WebDokan_Compat_Admin {
                         <tr>
                             <th scope="row"><label for="webdokan_api_key"><strong>WebDokan API Key <span style="color: #ef4444;">*</span></strong></label></th>
                             <td>
-                                <input name="webdokan_api_key" type="password" id="webdokan_api_key" value="<?php echo esc_attr($api_key); ?>" class="regular-text" style="border-radius: 8px; font-family: monospace;" placeholder="wdk_live_..." required />
-                                <p class="description">
-                                    Required to authenticate requests for domain <code><?php echo esc_html($site_domain); ?></code>. Generate your key on <a href="https://webdokan.com" target="_blank">WebDokan Partner Portal</a>.
+                                <div style="display: flex; gap: 8px; align-items: center; max-width: 580px; flex-wrap: wrap;">
+                                    <div style="position: relative; flex: 1; min-width: 260px;">
+                                        <input name="webdokan_api_key" type="password" id="webdokan_api_key" value="<?php echo esc_attr($api_key); ?>" class="regular-text" style="width: 100%; border-radius: 8px; font-family: monospace; padding-right: 36px;" placeholder="wdk_live_..." required />
+                                        <button type="button" id="webdokan-toggle-key-visibility" title="Show/Hide Key" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #64748b; font-size: 14px; padding: 4px;">
+                                            👁️
+                                        </button>
+                                    </div>
+                                    <button type="button" class="button button-secondary" id="webdokan-test-api-key-btn" style="border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                                        ⚡ Test API Key
+                                    </button>
+                                </div>
+                                <div id="webdokan-api-key-test-result" style="margin-top: 10px; max-width: 580px; display: none;"></div>
+                                <p class="description" style="margin-top: 8px;">
+                                    Required to authenticate requests for domain <code><?php echo esc_html($site_domain); ?></code>. Generate your key on <a href="https://webdokan.com" target="_blank" rel="noopener noreferrer">WebDokan Partner Portal</a>.
                                 </p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th scope="row"><label for="webdokan_api_url"><strong>WebDokan Cloud API URL</strong></label></th>
-                            <td>
-                                <input name="webdokan_api_url" type="url" id="webdokan_api_url" value="<?php echo esc_attr($api_url); ?>" class="regular-text" style="border-radius: 8px;" />
-                                <p class="description">Default: <code>https://webdokan.com</code></p>
                             </td>
                         </tr>
                         <tr>
