@@ -54,11 +54,40 @@ if (!class_exists('WebDokan_Compat_Frontend')) {
                         strpos($marketingName, $q_lower) !== false ||
                         strpos($name, $q_lower) !== false ||
                         strpos($wddId, $q_lower) !== false) {
+                        
+                        // Guarantee clean public WDD SKU format (e.g. WDD681402, WDD789013)
+                        $clean_wdd = !empty($d['sku']) ? $d['sku'] : (!empty($d['wddId']) ? $d['wddId'] : (!empty($d['entryId']) ? ('WDD' . $d['entryId']) : ('WDD' . ($d['id'] ?? ''))));
+                        $d['sku'] = $clean_wdd;
+                        $d['wddId'] = $clean_wdd;
+                        $d['name'] = !empty($d['name']) ? $d['name'] : trim(($d['brand'] ?? '') . ' ' . (!empty($d['marketingName']) ? $d['marketingName'] : ($d['model'] ?? '')));
+
                         $results[] = $d;
                         if (count($results) >= 15) {
                             break;
                         }
                     }
+                }
+
+                // Log search stats for store analytics
+                if (!empty($q_lower) && !empty($results)) {
+                    $stats = get_option('webdokan_local_analytics', array(
+                        'totalChecks' => 0,
+                        'todayChecks' => 0,
+                        'todayDate'   => current_time('Y-m-d'),
+                        'topDevices'  => array()
+                    ));
+                    $today = current_time('Y-m-d');
+                    if (($stats['todayDate'] ?? '') !== $today) {
+                        $stats['todayDate'] = $today;
+                        $stats['todayChecks'] = 0;
+                    }
+                    $stats['totalChecks'] = ($stats['totalChecks'] ?? 0) + 1;
+                    $stats['todayChecks'] = ($stats['todayChecks'] ?? 0) + 1;
+                    $firstModel = $results[0]['name'] ?? ($results[0]['brand'] . ' ' . $results[0]['model']);
+                    if (!empty($firstModel)) {
+                        $stats['topDevices'][$firstModel] = ($stats['topDevices'][$firstModel] ?? 0) + 1;
+                    }
+                    update_option('webdokan_local_analytics', $stats, false);
                 }
 
                 wp_send_json(array(
@@ -164,15 +193,38 @@ if (!class_exists('WebDokan_Compat_Frontend')) {
                 return; // Strict rule: No badge rendered if no verified WDP ID exists
             }
 
-            $this->output_widget_html($wdp_id);
+            $default_wdd = get_post_meta($product_id, '_webdokan_default_wdd', true);
+
+            $this->output_widget_html($wdp_id, $default_wdd);
         }
 
-        private function output_widget_html($wdp_id) {
-            $default_wdd = 'WDD2388'; // Certified default flagship device ID (Apple iPhone 15 Pro)
+        private function output_widget_html($wdp_id, $default_wdd = '') {
+            $default_wdd = trim((string)$default_wdd);
+            $initial_name = '';
+
+            if (!empty($default_wdd)) {
+                $synced = get_option('webdokan_synced_devices', array());
+                if (!empty($synced) && is_array($synced)) {
+                    foreach ($synced as $d) {
+                        $sku = $d['sku'] ?? $d['wddId'] ?? '';
+                        if (strcasecmp($sku, $default_wdd) === 0 || strcasecmp($d['id'] ?? '', $default_wdd) === 0) {
+                            $initial_name = $d['name'] ?? trim(($d['brand'] ?? '') . ' ' . ($d['marketingName'] ?? $d['model'] ?? ''));
+                            break;
+                        }
+                    }
+                }
+                if (empty($initial_name)) {
+                    $initial_name = $default_wdd;
+                }
+                $iframe_src = 'https://webdokan.com/' . rawurlencode($wdp_id) . '/' . rawurlencode($default_wdd) . '/score';
+            } else {
+                $iframe_src = 'https://webdokan.com/' . rawurlencode($wdp_id) . '/score';
+            }
             ?>
             <div class="webdokan-compat-container" 
                  data-wdp-id="<?php echo esc_attr($wdp_id); ?>"
                  data-default-wdd="<?php echo esc_attr($default_wdd); ?>"
+                 data-nosnippet="true"
                  style="max-width: 540px; margin: 18px auto; width: 100%; box-sizing: border-box;">
                 
                 <!-- Single Sleek Search Input with Embedded Change Button -->
@@ -181,8 +233,8 @@ if (!class_exists('WebDokan_Compat_Frontend')) {
                         <span class="webdokan-search-prefix-icon" style="font-size: 14px; margin-right: 6px; flex-shrink: 0; line-height: 1;">📱</span>
                         <input type="text" 
                                class="webdokan-device-search-input" 
-                               value="Apple iPhone 15 Pro"
-                               data-selected-name="Apple iPhone 15 Pro"
+                               value="<?php echo esc_attr($initial_name); ?>"
+                               data-selected-name="<?php echo esc_attr($initial_name); ?>"
                                placeholder="Search your phone model (e.g. Oppo, Galaxy, iPhone)..." 
                                autocomplete="off" 
                                aria-label="Search phone model for compatibility score"
@@ -196,17 +248,16 @@ if (!class_exists('WebDokan_Compat_Frontend')) {
                     <div class="webdokan-suggestions-list" style="display: none;"></div>
                 </div>
 
-                <!-- Score Iframe Container -->
-                <div class="webdokan-iframe-wrapper" style="position: relative; width: 100%; border-radius: 24px; overflow: hidden; background: #ffffff;">
-                    <iframe class="webdokan-score-iframe"
-                            src="<?php echo esc_url('https://webdokan.com/' . $wdp_id . '/' . $default_wdd . '/score?embed=1'); ?>" 
+                <!-- Score Iframe Container (Height clamped to cleanly hide bottom action buttons) -->
+                <div class="webdokan-iframe-wrapper" style="position: relative; width: 100%; max-width: 540px; height: 505px; border-radius: 24px; overflow: hidden; background: #ffffff; margin: 0 auto; box-shadow: 0 4px 20px rgba(0,0,0,0.04);">
+                    <iframe src="<?php echo esc_url($iframe_src); ?>" 
+                            class="webdokan-score-iframe"
                             width="100%" 
                             height="580" 
                             frameborder="0" 
-                            style="border-radius:24px; max-width:540px; border:none; display:block; margin: 0 auto; background:#ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.04);"
+                            style="border-radius:24px; max-width:540px; border:none; display:block; margin:auto; background:#ffffff; position: relative; top: 0;"
                             loading="lazy"
-                            allowtransparency="true"
-                            title="WebDokan Verified Hardware Compatibility Score">
+                            title="WebDokan Compatibility Score">
                     </iframe>
                 </div>
             </div>

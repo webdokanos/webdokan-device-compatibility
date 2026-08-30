@@ -6,7 +6,7 @@
 (function () {
     'use strict';
 
-    document.addEventListener('DOMContentLoaded', function () {
+    function initWidgets() {
         var containers = document.querySelectorAll('.webdokan-compat-container');
         if (!containers.length) return;
 
@@ -19,41 +19,33 @@
         };
 
         var localCatalog = Array.isArray(config.syncedDevices) ? config.syncedDevices : [];
-        var defaultWddId = 'WDD2388';
-        var defaultDeviceName = 'Apple iPhone 15 Pro';
 
         containers.forEach(function (container) {
             var wdpId = container.getAttribute('data-wdp-id') || '';
-            var fallbackWdd = container.getAttribute('data-default-wdd') || defaultWddId;
+            var defaultWdd = container.getAttribute('data-default-wdd') || '';
             var searchInput = container.querySelector('.webdokan-device-search-input');
             var actionBtn = container.querySelector('.webdokan-search-action-btn');
             var suggestionsList = container.querySelector('.webdokan-suggestions-list');
             var iframe = container.querySelector('.webdokan-score-iframe');
 
             var searchDebounceTimer = null;
-            var activeWddId = fallbackWdd;
-            var selectedName = defaultDeviceName;
+            var activeWddId = defaultWdd;
+            var selectedName = searchInput ? (searchInput.value || '') : '';
 
             function updateScoreIframe(newWddId, deviceName) {
-                activeWddId = newWddId || fallbackWdd;
-                selectedName = deviceName || defaultDeviceName;
+                activeWddId = newWddId || '';
+                selectedName = deviceName || '';
 
                 if (searchInput) {
                     searchInput.value = selectedName;
                     searchInput.setAttribute('data-selected-name', selectedName);
                 }
 
-                if (iframe) {
-                    var iframeUrl = config.apiUrl + '/' + encodeURIComponent(wdpId) + '/' + encodeURIComponent(activeWddId) + '/score' +
-                        '?embed=1' +
-                        (config.apiKey ? '&api_key=' + encodeURIComponent(config.apiKey) : '') +
-                        (config.siteDomain ? '&domain=' + encodeURIComponent(config.siteDomain) : '');
-
-                    iframe.style.opacity = '0.4';
-                    iframe.src = iframeUrl;
-                    iframe.onload = function () {
-                        iframe.style.opacity = '1';
-                    };
+                if (iframe && activeWddId) {
+                    var cleanWdd = String(activeWddId).trim();
+                    var newSrc = config.apiUrl + '/' + encodeURIComponent(wdpId) + '/' + encodeURIComponent(cleanWdd) + '/score';
+                    iframe.setAttribute('src', newSrc);
+                    iframe.src = newSrc;
                 }
             }
 
@@ -79,13 +71,33 @@
             }
 
             function fallbackCloudSearch(query) {
-                var searchUrl = config.apiUrl + '/api/v1/compatibility/search-devices?q=' + encodeURIComponent(query || '') +
+                var q = (query || '').trim();
+                if (!q) {
+                    renderSuggestions([]);
+                    return;
+                }
+
+                // Query standard /api/v1/compatibility/models?brand= or /search-devices
+                var modelsUrl = config.apiUrl + '/api/v1/compatibility/models?brand=' + encodeURIComponent(q) +
                     (config.apiKey ? '&api_key=' + encodeURIComponent(config.apiKey) : '');
 
-                fetch(searchUrl)
+                fetch(modelsUrl)
                     .then(function (res) { return res.json(); })
                     .then(function (data) {
-                        renderSuggestions(data.devices || []);
+                        if (data && data.models && data.models.length > 0) {
+                            renderSuggestions(data.models);
+                        } else {
+                            var searchUrl = config.apiUrl + '/api/v1/compatibility/search-devices?q=' + encodeURIComponent(q) +
+                                (config.apiKey ? '&api_key=' + encodeURIComponent(config.apiKey) : '');
+                            fetch(searchUrl)
+                                .then(function (r) { return r.json(); })
+                                .then(function (sd) {
+                                    renderSuggestions(sd.devices || []);
+                                })
+                                .catch(function () {
+                                    renderSuggestions([]);
+                                });
+                        }
                     })
                     .catch(function () {
                         renderSuggestions([]);
@@ -101,7 +113,7 @@
 
                 var html = '';
                 devices.forEach(function (d) {
-                    var wdd = d.wddId || d.sku || ('WDD' + d.id);
+                    var wdd = d.sku || d.wddId || (d.entryId ? ('WDD' + d.entryId) : ('WDD' + (d.id || '')));
                     var brand = d.brand || 'Phone';
                     var displayName = d.name || d.marketingName || d.model || (brand + ' ' + (d.model || ''));
                     
@@ -119,16 +131,20 @@
 
                 var items = suggestionsList.querySelectorAll('.webdokan-suggestion-item');
                 items.forEach(function (item) {
-                    item.addEventListener('click', function () {
-                        var targetWdd = this.getAttribute('data-wdd-id');
-                        var targetName = this.getAttribute('data-device-name');
+                    function selectItem(e) {
+                        if (e && e.preventDefault) e.preventDefault();
+                        var targetWdd = item.getAttribute('data-wdd-id');
+                        var targetName = item.getAttribute('data-device-name');
                         updateScoreIframe(targetWdd, targetName);
                         suggestionsList.style.display = 'none';
-                    });
+                    }
+
+                    item.addEventListener('mousedown', selectItem);
+                    item.addEventListener('click', selectItem);
                 });
             }
 
-            // Input typing and focus
+            // Input typing, focus and Enter key handling
             if (searchInput) {
                 searchInput.addEventListener('focus', function () {
                     this.select();
@@ -140,13 +156,29 @@
                     clearTimeout(searchDebounceTimer);
                     searchDebounceTimer = setTimeout(function () {
                         performSearch(val);
-                    }, 120);
+                    }, 80);
+                });
+
+                searchInput.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter' || e.keyCode === 13) {
+                        e.preventDefault();
+                        if (suggestionsList && suggestionsList.style.display !== 'none') {
+                            var firstItem = suggestionsList.querySelector('.webdokan-suggestion-item');
+                            if (firstItem) {
+                                var targetWdd = firstItem.getAttribute('data-wdd-id');
+                                var targetName = firstItem.getAttribute('data-device-name');
+                                updateScoreIframe(targetWdd, targetName);
+                                suggestionsList.style.display = 'none';
+                            }
+                        }
+                    }
                 });
             }
 
             // Action "Change" button click
             if (actionBtn) {
-                actionBtn.addEventListener('click', function () {
+                actionBtn.addEventListener('click', function (e) {
+                    e.preventDefault();
                     if (searchInput) {
                         searchInput.focus();
                         searchInput.select();
@@ -167,6 +199,12 @@
                 }
             });
         });
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWidgets);
+    } else {
+        initWidgets();
+    }
 })();
 
