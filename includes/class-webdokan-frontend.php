@@ -53,11 +53,20 @@ if (!class_exists('WebDokan_Compat_Frontend')) {
                         true
                     );
 
+                    $api_url = get_option('webdokan_api_url', WEBDOKAN_DEFAULT_API_URL);
+                    if (empty($api_url)) {
+                        $api_url = WEBDOKAN_DEFAULT_API_URL;
+                    }
+                    $site_domain = parse_url(home_url(), PHP_URL_HOST);
+                    if (empty($site_domain)) {
+                        $site_domain = $_SERVER['HTTP_HOST'] ?? 'unknown';
+                    }
+
                     wp_localize_script('webdokan-widget-js', 'webdokanData', array(
-                        'apiUrl'       => rtrim(get_option('webdokan_api_url', WEBDOKAN_DEFAULT_API_URL), '/'),
+                        'apiUrl'       => rtrim($api_url, '/'),
                         'apiKey'       => get_option('webdokan_api_key', ''),
                         'linkToDetail' => get_option('webdokan_link_to_detail', 'yes') === 'yes',
-                        'siteDomain'   => parse_url(home_url(), PHP_URL_HOST)
+                        'siteDomain'   => $site_domain
                     ));
                 }
             }

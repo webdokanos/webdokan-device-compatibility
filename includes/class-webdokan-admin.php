@@ -26,8 +26,9 @@ if (!class_exists('WebDokan_Compat_Admin')) {
         add_action('wp_ajax_webdokan_test_api_key', array($this, 'ajax_test_api_key'));
     }
 
-    public function enqueue_admin_assets($hook) {
-        if ('post.php' === $hook || 'post-new.php' === $hook || strpos($hook, 'webdokan') !== false) {
+    public function enqueue_admin_assets($hook = '') {
+        $is_webdokan_page = (isset($_GET['page']) && $_GET['page'] === 'webdokan') || strpos($hook, 'webdokan') !== false;
+        if ('post.php' === $hook || 'post-new.php' === $hook || $is_webdokan_page) {
             wp_enqueue_style(
                 'webdokan-admin-css',
                 WEBDOKAN_COMPAT_PLUGIN_URL . 'assets/css/webdokan-widget.css',
@@ -41,10 +42,16 @@ if (!class_exists('WebDokan_Compat_Admin')) {
                 WEBDOKAN_COMPAT_VERSION,
                 true
             );
+
+            $api_url = get_option('webdokan_api_url', WEBDOKAN_DEFAULT_API_URL);
+            if (empty($api_url)) {
+                $api_url = WEBDOKAN_DEFAULT_API_URL;
+            }
+
             wp_localize_script('webdokan-admin-js', 'webdokanAdmin', array(
                 'ajaxUrl' => admin_url('admin-ajax.php'),
                 'nonce'   => wp_create_nonce('webdokan_admin_nonce'),
-                'apiUrl'  => get_option('webdokan_api_url', WEBDOKAN_DEFAULT_API_URL),
+                'apiUrl'  => $api_url,
                 'apiKey'  => get_option('webdokan_api_key', '')
             ));
         }
@@ -108,11 +115,15 @@ if (!class_exists('WebDokan_Compat_Admin')) {
             wp_send_json_error(array('message' => 'Please enter a WDP ID (e.g. WDP90950)'));
         }
 
-        $api_base = rtrim(get_option('webdokan_api_url', WEBDOKAN_DEFAULT_API_URL), '/');
+        $api_url = get_option('webdokan_api_url', WEBDOKAN_DEFAULT_API_URL);
+        if (empty($api_url)) {
+            $api_url = WEBDOKAN_DEFAULT_API_URL;
+        }
+        $api_base = rtrim($api_url, '/');
         $url = $api_base . '/api/v1/compatibility/product-lookup?wdp_id=' . urlencode($wdp_id) . '&api_key=' . urlencode($api_key);
 
         $response = wp_remote_get($url, array(
-            'timeout' => 10,
+            'timeout' => 12,
             'headers' => array(
                 'Accept' => 'application/json',
                 'X-WebDokan-Key' => $api_key
@@ -141,22 +152,29 @@ if (!class_exists('WebDokan_Compat_Admin')) {
     public function ajax_test_api_key() {
         check_ajax_referer('webdokan_admin_nonce', 'security');
 
-        if (!current_user_can('manage_woocommerce')) {
+        if (!current_user_can('manage_woocommerce') && !current_user_can('manage_options')) {
             wp_send_json_error(array('message' => 'Permission denied.'));
         }
 
         $api_key = sanitize_text_field($_POST['api_key'] ?? '');
         $site_domain = parse_url(home_url(), PHP_URL_HOST);
+        if (empty($site_domain)) {
+            $site_domain = $_SERVER['HTTP_HOST'] ?? 'unknown';
+        }
 
         if (empty($api_key)) {
             wp_send_json_error(array('message' => 'Please paste or enter an API Key first.'));
         }
 
-        $api_base = rtrim(get_option('webdokan_api_url', WEBDOKAN_DEFAULT_API_URL), '/');
+        $api_url = get_option('webdokan_api_url', WEBDOKAN_DEFAULT_API_URL);
+        if (empty($api_url)) {
+            $api_url = WEBDOKAN_DEFAULT_API_URL;
+        }
+        $api_base = rtrim($api_url, '/');
         $test_url = $api_base . '/api/v1/compatibility/analytics?domain=' . urlencode($site_domain) . '&api_key=' . urlencode($api_key);
 
         $response = wp_remote_get($test_url, array(
-            'timeout' => 10,
+            'timeout' => 12,
             'headers' => array(
                 'Accept' => 'application/json',
                 'X-WebDokan-Key' => $api_key
@@ -230,10 +248,16 @@ if (!class_exists('WebDokan_Compat_Admin')) {
     public function render_unified_page() {
         $api_key = get_option('webdokan_api_key', '');
         $api_url = get_option('webdokan_api_url', WEBDOKAN_DEFAULT_API_URL);
+        if (empty($api_url)) {
+            $api_url = WEBDOKAN_DEFAULT_API_URL;
+        }
         $position = get_option('webdokan_widget_position', 'woocommerce_before_add_to_cart_button');
         $link_to_detail = get_option('webdokan_link_to_detail', 'yes');
         $theme_mode = get_option('webdokan_theme_mode', 'auto');
         $site_domain = parse_url(home_url(), PHP_URL_HOST);
+        if (empty($site_domain)) {
+            $site_domain = $_SERVER['HTTP_HOST'] ?? 'unknown';
+        }
 
         // Fetch live analytics if API key exists
         $analytics = array(
@@ -250,7 +274,7 @@ if (!class_exists('WebDokan_Compat_Admin')) {
         if (!empty($api_key)) {
             $api_base = rtrim($api_url, '/');
             $response = wp_remote_get($api_base . '/api/v1/compatibility/analytics?domain=' . urlencode($site_domain) . '&api_key=' . urlencode($api_key), array(
-                'timeout' => 8,
+                'timeout' => 12,
                 'headers' => array('Accept' => 'application/json', 'X-WebDokan-Key' => $api_key)
             ));
 
@@ -396,6 +420,7 @@ if (!class_exists('WebDokan_Compat_Admin')) {
 
                 <form method="post" action="options.php" style="background: #fff; padding: 26px 32px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                     <?php settings_fields('webdokan_settings_group'); ?>
+                    <input type="hidden" name="webdokan_api_url" value="<?php echo esc_attr($api_url); ?>" />
                     
                     <table class="form-table" style="margin-top: 0;">
                         <tr>
