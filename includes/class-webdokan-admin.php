@@ -3,16 +3,18 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class WebDokan_Compat_Admin {
+if (!class_exists('WebDokan_Compat_Admin')) {
 
-    private static $instance = null;
+    class WebDokan_Compat_Admin {
 
-    public static function get_instance() {
-        if (null === self::$instance) {
-            self::$instance = new self();
+        private static $instance = null;
+
+        public static function get_instance() {
+            if (null === self::$instance) {
+                self::$instance = new self();
+            }
+            return self::$instance;
         }
-        return self::$instance;
-    }
 
     private function __construct() {
         add_action('woocommerce_product_options_inventory_product_data', array($this, 'add_wdp_product_field'));
@@ -469,4 +471,5 @@ class WebDokan_Compat_Admin {
         </div>
         <?php
     }
+}
 }
