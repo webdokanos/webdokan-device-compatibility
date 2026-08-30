@@ -117,68 +117,29 @@ if (!class_exists('WebDokan_Compat_Frontend')) {
         }
 
         private function output_widget_html($wdp_id) {
-            $link_to_detail = get_option('webdokan_link_to_detail', 'yes') === 'yes';
-            $theme_mode = get_option('webdokan_theme_mode', 'auto');
             $default_wdd = 'WDD833335'; // Fallback default flagship device ID
             ?>
-            <div class="webdokan-compat-container webdokan-theme-<?php echo esc_attr($theme_mode); ?>" 
+            <div class="webdokan-compat-container" 
                  data-wdp-id="<?php echo esc_attr($wdp_id); ?>"
-                 data-default-wdd="<?php echo esc_attr($default_wdd); ?>"
-                 data-link-enabled="<?php echo $link_to_detail ? '1' : '0'; ?>">
+                 data-default-wdd="<?php echo esc_attr($default_wdd); ?>">
                 
-                <!-- Lightweight Header -->
-                <div class="webdokan-compat-header">
-                    <div class="webdokan-compat-title">
-                        <span class="webdokan-shield-icon">
-                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                            </svg>
-                        </span>
-                        <span>Hardware Compatibility Lab</span>
-                    </div>
-                    <span class="webdokan-cert-tag">Verified • <?php echo esc_html($wdp_id); ?></span>
-                </div>
-
-                <!-- Clean Device Selection Bar with Quick Chips -->
-                <div class="webdokan-device-selector-card">
-                    <div class="webdokan-active-device-row">
-                        <div class="webdokan-active-device-info">
-                            <span class="webdokan-pulse-dot"></span>
-                            <span class="webdokan-active-device-title">Device:</span>
-                            <span class="webdokan-current-device-name">Apple iPhone 15 Pro</span>
-                        </div>
-                        <button type="button" class="webdokan-toggle-search-btn" title="Search another phone model">
-                            🔍 Change Model
+                <!-- Single Sleek Search Input with Embedded Change Button -->
+                <div class="webdokan-search-container">
+                    <div class="webdokan-search-input-wrapper">
+                        <span class="webdokan-search-prefix-icon">📱</span>
+                        <input type="text" 
+                               class="webdokan-device-search-input" 
+                               value="Apple iPhone 15 Pro"
+                               data-selected-name="Apple iPhone 15 Pro"
+                               placeholder="Search your phone model..." 
+                               autocomplete="off" 
+                               aria-label="Search phone model for compatibility score" />
+                        <button type="button" class="webdokan-search-action-btn" title="Change device model">
+                            Change
                         </button>
                     </div>
-
-                    <!-- Popular Quick Chips for 1-Click Switch -->
-                    <div class="webdokan-quick-chips-row">
-                        <span class="webdokan-chip-label">Quick Pick:</span>
-                        <button type="button" class="webdokan-quick-chip active" data-wdd-id="WDD833335" data-name="Apple iPhone 15 Pro">iPhone 15 Pro</button>
-                        <button type="button" class="webdokan-quick-chip" data-wdd-id="WDD833336" data-name="Samsung Galaxy S24 Ultra">Galaxy S24</button>
-                        <button type="button" class="webdokan-quick-chip" data-wdd-id="WDD833337" data-name="Google Pixel 8 Pro">Pixel 8</button>
-                        <button type="button" class="webdokan-quick-chip" data-wdd-id="WDD833338" data-name="Xiaomi Redmi Note 13 Pro">Redmi Note 13</button>
-                    </div>
-
-                    <!-- Expandable Autocomplete Search Bar -->
-                    <div class="webdokan-search-expand-wrap" style="display: none;">
-                        <div class="webdokan-search-input-box">
-                            <span class="webdokan-search-icon">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="11" cy="11" r="8"/>
-                                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                                </svg>
-                            </span>
-                            <input type="text" 
-                                   class="webdokan-device-search-input" 
-                                   placeholder="Type phone name or model (e.g. iPhone 14, S23, Xiaomi)..." 
-                                   autocomplete="off" 
-                                   aria-label="Search phone model for compatibility score" />
-                            <button type="button" class="webdokan-search-clear-btn" title="Close search">✕</button>
-                        </div>
-                        <div class="webdokan-suggestions-list" style="display: none;"></div>
-                    </div>
+                    <!-- Autocomplete Suggestions Dropdown -->
+                    <div class="webdokan-suggestions-list" style="display: none;"></div>
                 </div>
 
                 <!-- Score Iframe Container -->
@@ -188,18 +149,11 @@ if (!class_exists('WebDokan_Compat_Frontend')) {
                             width="100%" 
                             height="580" 
                             frameborder="0" 
-                            style="border-radius:22px; max-width:540px; border:none; display:block; margin:auto; background:#ffffff; box-shadow: 0 4px 18px rgba(0,0,0,0.03);"
+                            style="border-radius:24px; max-width:540px; border:none; display:block; margin: 10px auto 0 auto; background:#ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.04);"
                             loading="lazy"
                             allowtransparency="true"
                             title="WebDokan Verified Hardware Compatibility Score">
                     </iframe>
-                </div>
-
-                <!-- Footer Attribution -->
-                <div class="webdokan-compat-footer">
-                    <a href="<?php echo esc_url('https://webdokan.com/products/' . strtolower($wdp_id)); ?>" target="_blank" rel="noopener nofollow" class="webdokan-footer-link">
-                        <span class="webdokan-mini-shield">🛡️</span> Powered by WebDokan Certified Hardware Intelligence Engine
-                    </a>
                 </div>
             </div>
             <?php

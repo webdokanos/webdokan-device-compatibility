@@ -1,6 +1,6 @@
 /**
  * WebDokan Device Compatibility & Hardware Lab Client
- * Auto-detects visitor device, supports local synced devices, quick-pick chips, and iframe synchronization.
+ * Ultra-clean search pill input with live suggestions and score iframe sync.
  */
 
 (function () {
@@ -25,53 +25,34 @@
         // Detect user device from user agent
         function detectVisitorBrandOrModel() {
             var ua = navigator.userAgent || '';
-            if (/iPhone/i.test(ua)) {
-                return 'iPhone';
-            }
-            if (/SM-|Samsung|Galaxy/i.test(ua)) {
-                return 'Samsung';
-            }
-            if (/Pixel/i.test(ua)) {
-                return 'Pixel';
-            }
-            if (/Xiaomi|Redmi|POCO/i.test(ua)) {
-                return 'Redmi';
-            }
-            if (/OnePlus/i.test(ua)) {
-                return 'OnePlus';
-            }
+            if (/iPhone/i.test(ua)) return 'iPhone';
+            if (/SM-|Samsung|Galaxy/i.test(ua)) return 'Samsung';
+            if (/Pixel/i.test(ua)) return 'Pixel';
+            if (/Xiaomi|Redmi|POCO/i.test(ua)) return 'Redmi';
+            if (/OnePlus/i.test(ua)) return 'OnePlus';
             return null;
         }
 
         containers.forEach(function (container) {
             var wdpId = container.getAttribute('data-wdp-id') || '';
             var fallbackWdd = container.getAttribute('data-default-wdd') || defaultWddId;
-            var searchExpandWrap = container.querySelector('.webdokan-search-expand-wrap');
             var searchInput = container.querySelector('.webdokan-device-search-input');
-            var clearBtn = container.querySelector('.webdokan-search-clear-btn');
-            var toggleSearchBtn = container.querySelector('.webdokan-toggle-search-btn');
+            var actionBtn = container.querySelector('.webdokan-search-action-btn');
             var suggestionsList = container.querySelector('.webdokan-suggestions-list');
-            var currentDeviceLabel = container.querySelector('.webdokan-current-device-name');
-            var quickChips = container.querySelectorAll('.webdokan-quick-chip');
             var iframe = container.querySelector('.webdokan-score-iframe');
 
             var searchDebounceTimer = null;
             var activeWddId = fallbackWdd;
+            var selectedName = defaultDeviceName;
 
             function updateScoreIframe(newWddId, deviceName) {
                 activeWddId = newWddId || fallbackWdd;
-                if (currentDeviceLabel && deviceName) {
-                    currentDeviceLabel.textContent = deviceName;
-                }
+                selectedName = deviceName || defaultDeviceName;
 
-                // Update active state on quick chips
-                quickChips.forEach(function (chip) {
-                    if (chip.getAttribute('data-wdd-id') === activeWddId) {
-                        chip.classList.add('active');
-                    } else {
-                        chip.classList.remove('active');
-                    }
-                });
+                if (searchInput) {
+                    searchInput.value = selectedName;
+                    searchInput.setAttribute('data-selected-name', selectedName);
+                }
 
                 if (iframe) {
                     var iframeUrl = config.apiUrl + '/' + encodeURIComponent(wdpId) + '/' + encodeURIComponent(activeWddId) + '/score' +
@@ -79,7 +60,7 @@
                         (config.apiKey ? '&api_key=' + encodeURIComponent(config.apiKey) : '') +
                         (config.siteDomain ? '&domain=' + encodeURIComponent(config.siteDomain) : '');
 
-                    iframe.style.opacity = '0.6';
+                    iframe.style.opacity = '0.5';
                     iframe.src = iframeUrl;
                     iframe.onload = function () {
                         iframe.style.opacity = '1';
@@ -87,7 +68,7 @@
                 }
             }
 
-            // Perform auto-detection
+            // Auto-detect visitor's phone model
             var detectedKeyword = detectVisitorBrandOrModel();
             if (detectedKeyword) {
                 if (localCatalog.length > 0) {
@@ -111,38 +92,14 @@
                 }
             }
 
-            // Quick Chips Click Event
-            quickChips.forEach(function (chip) {
-                chip.addEventListener('click', function () {
-                    var targetWdd = this.getAttribute('data-wdd-id');
-                    var targetName = this.getAttribute('data-name');
-                    updateScoreIframe(targetWdd, targetName);
-                    if (searchExpandWrap) searchExpandWrap.style.display = 'none';
-                });
-            });
-
-            // Toggle Search Bar
-            if (toggleSearchBtn) {
-                toggleSearchBtn.addEventListener('click', function () {
-                    if (searchExpandWrap) {
-                        var isVisible = searchExpandWrap.style.display !== 'none';
-                        searchExpandWrap.style.display = isVisible ? 'none' : 'block';
-                        if (!isVisible && searchInput) {
-                            searchInput.focus();
-                            performSearch(searchInput.value.trim());
-                        }
-                    }
-                });
-            }
-
-            // Search autocomplete handler (searches local catalog first for 0ms speed)
+            // Search autocomplete handler
             function performSearch(query) {
                 var q = (query || '').toLowerCase().trim();
 
                 if (localCatalog.length > 0) {
                     var filtered = [];
                     if (!q) {
-                        filtered = localCatalog.slice(0, 10);
+                        filtered = localCatalog.slice(0, 12);
                     } else {
                         filtered = localCatalog.filter(function (d) {
                             var str = ((d.brand || '') + ' ' + (d.marketingName || d.model || '') + ' ' + (d.wddId || '')).toLowerCase();
@@ -195,13 +152,17 @@
                         var targetName = this.getAttribute('data-device-name');
                         updateScoreIframe(targetWdd, targetName);
                         suggestionsList.style.display = 'none';
-                        if (searchExpandWrap) searchExpandWrap.style.display = 'none';
                     });
                 });
             }
 
-            // Input typing event
+            // Input typing and focus
             if (searchInput) {
+                searchInput.addEventListener('focus', function () {
+                    this.select();
+                    performSearch('');
+                });
+
                 searchInput.addEventListener('input', function () {
                     var val = this.value.trim();
                     clearTimeout(searchDebounceTimer);
@@ -209,26 +170,27 @@
                         performSearch(val);
                     }, 120);
                 });
-
-                searchInput.addEventListener('focus', function () {
-                    performSearch(this.value.trim());
-                });
             }
 
-            // Clear / Close button
-            if (clearBtn) {
-                clearBtn.addEventListener('click', function () {
-                    if (searchExpandWrap) {
-                        searchExpandWrap.style.display = 'none';
+            // Action "Change" button click
+            if (actionBtn) {
+                actionBtn.addEventListener('click', function () {
+                    if (searchInput) {
+                        searchInput.focus();
+                        searchInput.select();
+                        performSearch('');
                     }
                 });
             }
 
-            // Close suggestions on outside click
+            // Close suggestions on outside click and restore selected name if left empty
             document.addEventListener('click', function (e) {
                 if (!container.contains(e.target)) {
                     if (suggestionsList) {
                         suggestionsList.style.display = 'none';
+                    }
+                    if (searchInput && !searchInput.value.trim()) {
+                        searchInput.value = selectedName;
                     }
                 }
             });
