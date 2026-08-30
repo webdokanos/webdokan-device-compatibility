@@ -16,6 +16,24 @@ if (!class_exists('WebDokan_Compat_Admin')) {
             return self::$instance;
         }
 
+        public static function normalize_api_key($key) {
+            $clean = trim((string)$key);
+            if (empty($clean)) {
+                return '';
+            }
+            // Always enforce standard wdk_ format so live cloud API accepts it immediately
+            if (strpos($clean, 'wd_live_') === 0) {
+                return 'wdk_live_' . substr($clean, 8);
+            }
+            if (strpos($clean, 'wd_') === 0) {
+                return 'wdk_' . substr($clean, 3);
+            }
+            if (strpos($clean, 'wdk_') !== 0) {
+                return 'wdk_' . ltrim($clean, '_');
+            }
+            return $clean;
+        }
+
     private function __construct() {
         add_action('woocommerce_product_options_inventory_product_data', array($this, 'add_wdp_product_field'));
         add_action('woocommerce_process_product_meta', array($this, 'save_wdp_product_field'));
@@ -24,6 +42,7 @@ if (!class_exists('WebDokan_Compat_Admin')) {
         add_action('admin_init', array($this, 'register_settings'));
         add_action('wp_ajax_webdokan_verify_wdp', array($this, 'ajax_verify_wdp'));
         add_action('wp_ajax_webdokan_test_api_key', array($this, 'ajax_test_api_key'));
+        add_action('wp_ajax_webdokan_sync_devices', array($this, 'ajax_sync_devices'));
     }
 
     public function enqueue_admin_assets($hook = '') {
@@ -52,7 +71,7 @@ if (!class_exists('WebDokan_Compat_Admin')) {
                 'ajaxUrl' => admin_url('admin-ajax.php'),
                 'nonce'   => wp_create_nonce('webdokan_admin_nonce'),
                 'apiUrl'  => $api_url,
-                'apiKey'  => get_option('webdokan_api_key', '')
+                'apiKey'  => self::normalize_api_key(get_option('webdokan_api_key', ''))
             ));
         }
     }
@@ -60,7 +79,7 @@ if (!class_exists('WebDokan_Compat_Admin')) {
     public function add_wdp_product_field() {
         global $post;
         $wdp_id = get_post_meta($post->ID, '_webdokan_wdp_id', true);
-        $api_key = get_option('webdokan_api_key', '');
+        $api_key = self::normalize_api_key(get_option('webdokan_api_key', ''));
         ?>
         <div class="options_group show_if_simple show_if_variable" style="border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 12px;">
             <p class="form-field _webdokan_wdp_id_field">
@@ -138,7 +157,7 @@ if (!class_exists('WebDokan_Compat_Admin')) {
     public function ajax_verify_wdp() {
         check_ajax_referer('webdokan_admin_nonce', 'security');
         $wdp_id = sanitize_text_field($_POST['wdp_id'] ?? '');
-        $api_key = get_option('webdokan_api_key', '');
+        $api_key = self::normalize_api_key(get_option('webdokan_api_key', ''));
 
         if (empty($api_key)) {
             wp_send_json_error(array('message' => 'WebDokan API Key is missing. Please configure it in WebDokan Settings.'));
@@ -189,7 +208,7 @@ if (!class_exists('WebDokan_Compat_Admin')) {
             wp_send_json_error(array('message' => 'Permission denied.'));
         }
 
-        $api_key = sanitize_text_field($_POST['api_key'] ?? '');
+        $api_key = self::normalize_api_key($_POST['api_key'] ?? '');
         $site_domain = parse_url(home_url(), PHP_URL_HOST);
         if (empty($site_domain)) {
             $site_domain = $_SERVER['HTTP_HOST'] ?? 'unknown';
@@ -238,6 +257,50 @@ if (!class_exists('WebDokan_Compat_Admin')) {
         }
     }
 
+    public function ajax_sync_devices() {
+        check_ajax_referer('webdokan_admin_nonce', 'security');
+
+        if (!current_user_can('manage_woocommerce') && !current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Permission denied.'));
+        }
+
+        $api_url = get_option('webdokan_api_url', WEBDOKAN_DEFAULT_API_URL);
+        if (empty($api_url)) {
+            $api_url = WEBDOKAN_DEFAULT_API_URL;
+        }
+        $api_base = rtrim($api_url, '/');
+        $api_key = self::normalize_api_key(get_option('webdokan_api_key', ''));
+
+        $sync_url = $api_base . '/api/v1/compatibility/sync-devices?api_key=' . urlencode($api_key);
+
+        $response = wp_remote_get($sync_url, array(
+            'timeout' => 20,
+            'headers' => array(
+                'Accept' => 'application/json',
+                'X-WebDokan-Key' => $api_key
+            )
+        ));
+
+        if (is_wp_error($response)) {
+            wp_send_json_error(array('message' => 'Failed to reach WebDokan Cloud: ' . $response->get_error_message()));
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+
+        if ($code === 200 && isset($body['devices']) && is_array($body['devices'])) {
+            update_option('webdokan_synced_devices', $body['devices'], false);
+            update_option('webdokan_devices_last_synced', current_time('mysql'));
+            wp_send_json_success(array(
+                'count' => count($body['devices']),
+                'last_synced' => current_time('mysql'),
+                'message' => 'Successfully synced ' . count($body['devices']) . ' device models & marketing names!'
+            ));
+        } else {
+            wp_send_json_error(array('message' => $body['error'] ?? 'Device synchronization failed.'));
+        }
+    }
+
     public function add_admin_pages() {
         // Unified single page under WooCommerce named "WebDokan"
         add_submenu_page(
@@ -253,7 +316,7 @@ if (!class_exists('WebDokan_Compat_Admin')) {
     public function register_settings() {
         register_setting('webdokan_settings_group', 'webdokan_api_key', array(
             'type'              => 'string',
-            'sanitize_callback' => 'sanitize_text_field',
+            'sanitize_callback' => array('WebDokan_Compat_Admin', 'normalize_api_key'),
             'default'           => ''
         ));
         register_setting('webdokan_settings_group', 'webdokan_api_url', array(
@@ -279,7 +342,7 @@ if (!class_exists('WebDokan_Compat_Admin')) {
     }
 
     public function render_unified_page() {
-        $api_key = get_option('webdokan_api_key', '');
+        $api_key = self::normalize_api_key(get_option('webdokan_api_key', ''));
         $api_url = get_option('webdokan_api_url', WEBDOKAN_DEFAULT_API_URL);
         if (empty($api_url)) {
             $api_url = WEBDOKAN_DEFAULT_API_URL;
@@ -445,7 +508,34 @@ if (!class_exists('WebDokan_Compat_Admin')) {
                 </div>
             </div>
 
-            <!-- SECTION 2: Plugin Settings & Configuration -->
+            <!-- SECTION 2: Local Device Catalog Sync -->
+            <?php 
+                $synced_devices = get_option('webdokan_synced_devices', array());
+                $last_synced = get_option('webdokan_devices_last_synced', 'Never');
+                $is_synced = !empty($synced_devices);
+            ?>
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px 28px; margin-bottom: 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="max-width: 580px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <h3 style="margin: 0; font-size: 15px; font-weight: 800; color: #0f172a;">📱 Device Models & Marketing Names Sync</h3>
+                        <span id="webdokan-sync-badge" style="font-size: 11px; font-weight: 700; background: <?php echo $is_synced ? '#f0fdf4' : '#fffbeb'; ?>; color: <?php echo $is_synced ? '#166534' : '#92400e'; ?>; border: 1px solid <?php echo $is_synced ? '#86efac' : '#fde68a'; ?>; padding: 2px 9px; border-radius: 9999px;">
+                            <?php echo $is_synced ? '✅ ' . count($synced_devices) . ' Models Synced' : '⚠️ Not Synced'; ?>
+                        </span>
+                    </div>
+                    <p style="margin: 6px 0 0 0; font-size: 12px; color: #64748b; line-height: 1.6;">
+                        Syncs all certified device marketing names (e.g. <em>Apple iPhone 15 Pro, Samsung Galaxy S24 Ultra</em>) and WDD model codes locally into WordPress. Enables ultra-light, instant autocomplete search for your store visitors.
+                        <span style="display: block; margin-top: 3px; font-size: 11px; color: #94a3b8;" id="webdokan-sync-time">Last synced: <?php echo esc_html($last_synced); ?></span>
+                    </p>
+                    <div id="webdokan-sync-result" style="margin-top: 10px; display: none;"></div>
+                </div>
+                <div>
+                    <button type="button" class="button button-primary" id="webdokan-sync-devices-btn" onclick="if(window.webdokanSyncDevices){window.webdokanSyncDevices(event);}" style="border-radius: 10px; font-weight: 700; padding: 6px 20px; display: inline-flex; align-items: center; gap: 6px;">
+                        🔄 Sync Device Catalog
+                    </button>
+                </div>
+            </div>
+
+            <!-- SECTION 3: Plugin Settings & Configuration -->
             <div style="margin-bottom: 32px;">
                 <h2 style="font-size: 16px; font-weight: 800; color: #0f172a; margin-bottom: 14px; display: flex; align-items: center; gap: 6px;">
                     ⚙️ Cloud Connection & Widget Settings
@@ -515,7 +605,7 @@ if (!class_exists('WebDokan_Compat_Admin')) {
                 </form>
             </div>
 
-            <!-- SECTION 3: How to Tag Products -->
+            <!-- SECTION 4: How to Tag Products -->
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px; margin-bottom: 24px;">
                 <h3 style="margin: 0 0 10px 0; font-size: 14px; font-weight: 800; color: #0f172a;">💡 How to Enable Compatibility Scoring on Products</h3>
                 <ol style="margin: 0; padding-left: 20px; font-size: 12px; color: #475569; line-height: 1.8;">
@@ -579,6 +669,41 @@ if (!class_exists('WebDokan_Compat_Admin')) {
                 error: function(xhr, status, error) {
                     $btn.prop('disabled', false).text('⚡ Test API Key');
                     $keyResultBox.html('<div style="background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #991b1b; line-height: 1.5;">❌ Connection error. Try saving first.</div>');
+                }
+            });
+        };
+
+        window.webdokanSyncDevices = window.webdokanSyncDevices || function(e) {
+            if(e && e.preventDefault) e.preventDefault();
+            var $btn = jQuery('#webdokan-sync-devices-btn');
+            var $resultBox = jQuery('#webdokan-sync-result');
+            var $badge = jQuery('#webdokan-sync-badge');
+            var $time = jQuery('#webdokan-sync-time');
+
+            $btn.prop('disabled', true).text('⏳ Syncing Catalog...');
+            $resultBox.show().html('<div style="color: #64748b; font-size: 12px;">Fetching certified device profiles from WebDokan Cloud...</div>');
+
+            var ajaxUrl = (window.webdokanAdmin && window.webdokanAdmin.ajaxUrl) ? window.webdokanAdmin.ajaxUrl : (typeof ajaxurl !== 'undefined' ? ajaxurl : '/wp-admin/admin-ajax.php');
+            var nonce = (window.webdokanAdmin && window.webdokanAdmin.nonce) ? window.webdokanAdmin.nonce : '<?php echo esc_js(wp_create_nonce('webdokan_admin_nonce')); ?>';
+
+            jQuery.ajax({
+                url: ajaxUrl,
+                type: 'POST',
+                data: { action: 'webdokan_sync_devices', security: nonce },
+                success: function(res) {
+                    $btn.prop('disabled', false).text('🔄 Sync Device Catalog');
+                    if(res.success && res.data) {
+                        $badge.css({'background': '#f0fdf4', 'color': '#166534', 'border-color': '#86efac'}).text('✅ ' + res.data.count + ' Models Synced');
+                        $time.text('Last synced: ' + res.data.last_synced);
+                        $resultBox.html('<div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #166534; font-weight: 600;">' + res.data.message + '</div>');
+                    } else {
+                        var msg = (res.data && res.data.message) ? res.data.message : 'Sync failed. Check your API key and connection.';
+                        $resultBox.html('<div style="background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #991b1b;">❌ ' + msg + '</div>');
+                    }
+                },
+                error: function() {
+                    $btn.prop('disabled', false).text('🔄 Sync Device Catalog');
+                    $resultBox.html('<div style="background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #991b1b;">❌ Communication error while syncing.</div>');
                 }
             });
         };

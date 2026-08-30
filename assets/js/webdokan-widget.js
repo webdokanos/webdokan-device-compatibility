@@ -1,6 +1,6 @@
 /**
- * WebDokan Device Compatibility Frontend Client
- * Asynchronously checks compatibility and renders official split-pill capsule badges.
+ * WebDokan Device Compatibility & Hardware Lab Client
+ * Auto-detects visitor device, supports local synced devices, quick-pick chips, and iframe synchronization.
  */
 
 (function () {
@@ -12,150 +12,227 @@
 
         var config = window.webdokanData || {
             apiUrl: 'https://webdokan.com',
+            apiKey: '',
             linkToDetail: true,
-            siteDomain: window.location.hostname
+            siteDomain: window.location.hostname,
+            syncedDevices: []
         };
 
-        var brandCache = null;
-        var modelCache = {};
+        var localCatalog = Array.isArray(config.syncedDevices) ? config.syncedDevices : [];
+        var defaultWddId = 'WDD833335';
+        var defaultDeviceName = 'Apple iPhone 15 Pro';
 
-        // Fetch Brands once and cache
-        function fetchBrands(callback) {
-            if (brandCache) {
-                return callback(brandCache);
+        // Detect user device from user agent
+        function detectVisitorBrandOrModel() {
+            var ua = navigator.userAgent || '';
+            if (/iPhone/i.test(ua)) {
+                return 'iPhone';
             }
-            fetch(config.apiUrl + '/api/v1/compatibility/brands')
-                .then(function (res) { return res.json(); })
-                .then(function (data) {
-                    brandCache = data.brands || [];
-                    callback(brandCache);
-                })
-                .catch(function (err) {
-                    console.warn('[WebDokan] Failed to load brands:', err);
-                });
+            if (/SM-|Samsung|Galaxy/i.test(ua)) {
+                return 'Samsung';
+            }
+            if (/Pixel/i.test(ua)) {
+                return 'Pixel';
+            }
+            if (/Xiaomi|Redmi|POCO/i.test(ua)) {
+                return 'Redmi';
+            }
+            if (/OnePlus/i.test(ua)) {
+                return 'OnePlus';
+            }
+            return null;
         }
 
-        // Initialize each widget on page
         containers.forEach(function (container) {
-            var wdpId = container.getAttribute('data-wdp-id');
-            var linkEnabled = container.getAttribute('data-link-enabled') === '1';
-            var brandSelect = container.querySelector('.webdokan-brand-select');
-            var modelSelect = container.querySelector('.webdokan-model-select');
-            var badgeContainer = container.querySelector('.webdokan-badge-container');
-            var badgePill = container.querySelector('.webdokan-compat-badge-pill');
-            var scoreNum = container.querySelector('.webdokan-score-num');
-            var badgeLabel = container.querySelector('.webdokan-badge-label');
-            var insightText = container.querySelector('.webdokan-insight-text');
-            var currentDetailUrl = '';
+            var wdpId = container.getAttribute('data-wdp-id') || '';
+            var fallbackWdd = container.getAttribute('data-default-wdd') || defaultWddId;
+            var searchExpandWrap = container.querySelector('.webdokan-search-expand-wrap');
+            var searchInput = container.querySelector('.webdokan-device-search-input');
+            var clearBtn = container.querySelector('.webdokan-search-clear-btn');
+            var toggleSearchBtn = container.querySelector('.webdokan-toggle-search-btn');
+            var suggestionsList = container.querySelector('.webdokan-suggestions-list');
+            var currentDeviceLabel = container.querySelector('.webdokan-current-device-name');
+            var quickChips = container.querySelectorAll('.webdokan-quick-chip');
+            var iframe = container.querySelector('.webdokan-score-iframe');
 
-            // Populate Brands
-            fetchBrands(function (brands) {
-                brands.forEach(function (b) {
-                    var opt = document.createElement('option');
-                    opt.value = b.name;
-                    opt.textContent = b.name + ' (' + b.count + ')';
-                    brandSelect.appendChild(opt);
-                });
-            });
+            var searchDebounceTimer = null;
+            var activeWddId = fallbackWdd;
 
-            // Handle Brand Selection
-            brandSelect.addEventListener('change', function () {
-                var brand = this.value;
-                modelSelect.innerHTML = '<option value="">Select Model...</option>';
-                badgeContainer.style.display = 'none';
-
-                if (!brand) {
-                    modelSelect.disabled = true;
-                    return;
+            function updateScoreIframe(newWddId, deviceName) {
+                activeWddId = newWddId || fallbackWdd;
+                if (currentDeviceLabel && deviceName) {
+                    currentDeviceLabel.textContent = deviceName;
                 }
 
-                modelSelect.disabled = true;
-
-                if (modelCache[brand]) {
-                    populateModels(modelCache[brand]);
-                } else {
-                    fetch(config.apiUrl + '/api/v1/compatibility/models?brand=' + encodeURIComponent(brand))
-                        .then(function (res) { return res.json(); })
-                        .then(function (data) {
-                            var models = data.models || [];
-                            modelCache[brand] = models;
-                            populateModels(models);
-                        })
-                        .catch(function (err) {
-                            console.warn('[WebDokan] Failed to load models:', err);
-                        });
-                }
-            });
-
-            function populateModels(models) {
-                models.forEach(function (m) {
-                    var opt = document.createElement('option');
-                    opt.value = m.model;
-                    opt.textContent = m.displayName;
-                    opt.setAttribute('data-device-id', m.id || m.sku || '');
-                    modelSelect.appendChild(opt);
+                // Update active state on quick chips
+                quickChips.forEach(function (chip) {
+                    if (chip.getAttribute('data-wdd-id') === activeWddId) {
+                        chip.classList.add('active');
+                    } else {
+                        chip.classList.remove('active');
+                    }
                 });
-                modelSelect.disabled = false;
+
+                if (iframe) {
+                    var iframeUrl = config.apiUrl + '/' + encodeURIComponent(wdpId) + '/' + encodeURIComponent(activeWddId) + '/score' +
+                        '?embed=1' +
+                        (config.apiKey ? '&api_key=' + encodeURIComponent(config.apiKey) : '') +
+                        (config.siteDomain ? '&domain=' + encodeURIComponent(config.siteDomain) : '');
+
+                    iframe.style.opacity = '0.6';
+                    iframe.src = iframeUrl;
+                    iframe.onload = function () {
+                        iframe.style.opacity = '1';
+                    };
+                }
             }
 
-            // Handle Model Selection (Triggers Score Calculation)
-            modelSelect.addEventListener('change', function () {
-                var model = this.value;
-                var brand = brandSelect.value;
-                if (!model || !brand) {
-                    badgeContainer.style.display = 'none';
+            // Perform auto-detection
+            var detectedKeyword = detectVisitorBrandOrModel();
+            if (detectedKeyword) {
+                if (localCatalog.length > 0) {
+                    var match = localCatalog.find(function (d) {
+                        var str = ((d.brand || '') + ' ' + (d.marketingName || d.model || '')).toLowerCase();
+                        return str.indexOf(detectedKeyword.toLowerCase()) !== -1;
+                    });
+                    if (match) {
+                        updateScoreIframe(match.wddId || ('WDD' + match.id), match.name || (match.brand + ' ' + match.model));
+                    }
+                } else {
+                    fetch(config.apiUrl + '/api/v1/compatibility/search-devices?q=' + encodeURIComponent(detectedKeyword))
+                        .then(function (res) { return res.json(); })
+                        .then(function (data) {
+                            if (data && data.devices && data.devices.length > 0) {
+                                var firstMatch = data.devices[0];
+                                updateScoreIframe(firstMatch.wddId || firstMatch.sku, firstMatch.name);
+                            }
+                        })
+                        .catch(function () {});
+                }
+            }
+
+            // Quick Chips Click Event
+            quickChips.forEach(function (chip) {
+                chip.addEventListener('click', function () {
+                    var targetWdd = this.getAttribute('data-wdd-id');
+                    var targetName = this.getAttribute('data-name');
+                    updateScoreIframe(targetWdd, targetName);
+                    if (searchExpandWrap) searchExpandWrap.style.display = 'none';
+                });
+            });
+
+            // Toggle Search Bar
+            if (toggleSearchBtn) {
+                toggleSearchBtn.addEventListener('click', function () {
+                    if (searchExpandWrap) {
+                        var isVisible = searchExpandWrap.style.display !== 'none';
+                        searchExpandWrap.style.display = isVisible ? 'none' : 'block';
+                        if (!isVisible && searchInput) {
+                            searchInput.focus();
+                            performSearch(searchInput.value.trim());
+                        }
+                    }
+                });
+            }
+
+            // Search autocomplete handler (searches local catalog first for 0ms speed)
+            function performSearch(query) {
+                var q = (query || '').toLowerCase().trim();
+
+                if (localCatalog.length > 0) {
+                    var filtered = [];
+                    if (!q) {
+                        filtered = localCatalog.slice(0, 10);
+                    } else {
+                        filtered = localCatalog.filter(function (d) {
+                            var str = ((d.brand || '') + ' ' + (d.marketingName || d.model || '') + ' ' + (d.wddId || '')).toLowerCase();
+                            return str.indexOf(q) !== -1;
+                        }).slice(0, 15);
+                    }
+                    renderSuggestions(filtered);
                     return;
                 }
 
-                // Show loading state
-                badgeContainer.style.display = 'block';
-                scoreNum.textContent = '...';
-                badgeLabel.textContent = 'CALCULATING...';
-                badgePill.setAttribute('data-type', 'functional');
-                insightText.textContent = 'Analyzing charging protocols and hardware fit...';
-
-                var checkUrl = config.apiUrl + '/api/v1/compatibility/check' +
-                    '?wdp_id=' + encodeURIComponent(wdpId) +
-                    '&brand=' + encodeURIComponent(brand) +
-                    '&model=' + encodeURIComponent(model) +
-                    '&api_key=' + encodeURIComponent(config.apiKey || '') +
-                    '&domain=' + encodeURIComponent(config.siteDomain);
-
-                fetch(checkUrl, {
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-WebDokan-Key': config.apiKey || ''
-                    }
-                })
+                // Fallback to Cloud Search API
+                var searchUrl = config.apiUrl + '/api/v1/compatibility/search-devices?q=' + encodeURIComponent(query || '');
+                fetch(searchUrl)
                     .then(function (res) { return res.json(); })
                     .then(function (data) {
-                        if (!data.success) {
-                            scoreNum.textContent = '0%';
-                            badgeLabel.textContent = 'INCOMPATIBLE';
-                            badgePill.setAttribute('data-type', 'incompatible');
-                            insightText.textContent = data.error || 'No verified profile match found.';
-                            return;
-                        }
-
-                        scoreNum.textContent = data.score + '%';
-                        badgeLabel.textContent = data.label;
-                        badgePill.setAttribute('data-type', data.badgeType || 'functional');
-                        insightText.textContent = data.insight;
-                        currentDetailUrl = data.detailUrl || '';
+                        renderSuggestions(data.devices || []);
                     })
-                    .catch(function (err) {
-                        console.error('[WebDokan] Check error:', err);
-                        scoreNum.textContent = '--%';
-                        badgeLabel.textContent = 'ERROR';
+                    .catch(function () {
+                        renderSuggestions([]);
                     });
-            });
+            }
 
-            // Handle Click on Split-Pill Badge
-            badgePill.addEventListener('click', function () {
-                if (linkEnabled && currentDetailUrl) {
-                    window.open(currentDetailUrl, '_blank', 'noopener,noreferrer');
+            function renderSuggestions(devices) {
+                if (!devices || !devices.length) {
+                    suggestionsList.innerHTML = '<div style="padding: 10px 12px; font-size: 12px; color: #94a3b8; text-align: center;">No matching phone models found.</div>';
+                    suggestionsList.style.display = 'block';
+                    return;
+                }
+
+                var html = '';
+                devices.forEach(function (d) {
+                    var wdd = d.wddId || d.sku || ('WDD' + d.id);
+                    var displayName = d.name || ((d.brand || '') + ' ' + (d.marketingName || d.model || ''));
+                    html += '<div class="webdokan-suggestion-item" data-wdd-id="' + wdd + '" data-device-name="' + displayName.trim() + '">' +
+                        '<div class="webdokan-suggestion-info">' +
+                        '<span class="webdokan-suggestion-brand">' + (d.brand || 'Phone') + '</span>' +
+                        '<span class="webdokan-suggestion-name">' + displayName.trim() + '</span>' +
+                        '</div>' +
+                        '<span class="webdokan-suggestion-sku">' + wdd + '</span>' +
+                        '</div>';
+                });
+
+                suggestionsList.innerHTML = html;
+                suggestionsList.style.display = 'block';
+
+                var items = suggestionsList.querySelectorAll('.webdokan-suggestion-item');
+                items.forEach(function (item) {
+                    item.addEventListener('click', function () {
+                        var targetWdd = this.getAttribute('data-wdd-id');
+                        var targetName = this.getAttribute('data-device-name');
+                        updateScoreIframe(targetWdd, targetName);
+                        suggestionsList.style.display = 'none';
+                        if (searchExpandWrap) searchExpandWrap.style.display = 'none';
+                    });
+                });
+            }
+
+            // Input typing event
+            if (searchInput) {
+                searchInput.addEventListener('input', function () {
+                    var val = this.value.trim();
+                    clearTimeout(searchDebounceTimer);
+                    searchDebounceTimer = setTimeout(function () {
+                        performSearch(val);
+                    }, 120);
+                });
+
+                searchInput.addEventListener('focus', function () {
+                    performSearch(this.value.trim());
+                });
+            }
+
+            // Clear / Close button
+            if (clearBtn) {
+                clearBtn.addEventListener('click', function () {
+                    if (searchExpandWrap) {
+                        searchExpandWrap.style.display = 'none';
+                    }
+                });
+            }
+
+            // Close suggestions on outside click
+            document.addEventListener('click', function (e) {
+                if (!container.contains(e.target)) {
+                    if (suggestionsList) {
+                        suggestionsList.style.display = 'none';
+                    }
                 }
             });
         });
     });
 })();
+

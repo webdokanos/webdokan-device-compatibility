@@ -1,103 +1,326 @@
 /* ==========================================================================
-   WebDokan Device Compatibility & Fit Badge Stylesheet
-   Matches exact WebDokan split-pill status capsule design
+   WebDokan Device Compatibility & Hardware Lab Stylesheet
+   Modern, ultra-light card UI with instant quick-pick chips & live search
    ========================================================================== */
 
 .webdokan-compat-container {
-    margin: 18px 0;
-    padding: 16px 18px;
-    border-radius: 18px;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.05);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-    color: #0f172a;
-    transition: all 0.2s ease;
-    box-sizing: border-box;
+    margin: 22px auto !important;
+    padding: 20px 22px !important;
+    border-radius: 24px !important;
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05) !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif !important;
+    color: #0f172a !important;
+    transition: all 0.25s ease !important;
+    box-sizing: border-box !important;
+    max-width: 580px !important;
+    width: 100% !important;
 }
 
 .webdokan-compat-container * {
-    box-sizing: border-box;
+    box-sizing: border-box !important;
 }
 
 /* Header */
 .webdokan-compat-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 12px;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    margin-bottom: 14px !important;
 }
 
 .webdokan-compat-title {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    font-weight: 700;
-    color: #1e293b;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    letter-spacing: -0.2px !important;
 }
 
 .webdokan-shield-icon {
-    color: #059669;
-    display: flex;
-    align-items: center;
+    color: #059669 !important;
+    display: flex !important;
+    align-items: center !important;
 }
 
 .webdokan-cert-tag {
-    font-size: 10px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 2px 8px;
-    border-radius: 9999px;
-    background: #f1f5f9;
-    color: #64748b;
-    border: 1px solid #e2e8f0;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.6px !important;
+    padding: 3px 10px !important;
+    border-radius: 9999px !important;
+    background: #f1f5f9 !important;
+    color: #475569 !important;
+    border: 1px solid #e2e8f0 !important;
 }
 
-/* Selectors Row */
-.webdokan-selectors-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 14px;
+/* Device Selector Card */
+.webdokan-device-selector-card {
+    background: #f8fafc !important;
+    border: 1px solid #edf2f7 !important;
+    border-radius: 18px !important;
+    padding: 12px 14px !important;
+    margin-bottom: 14px !important;
 }
 
-@media (max-width: 480px) {
-    .webdokan-selectors-row {
-        grid-template-columns: 1fr;
-    }
+.webdokan-active-device-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    flex-wrap: wrap !important;
 }
 
-.webdokan-select-wrap select {
-    width: 100%;
-    height: 38px;
-    padding: 0 12px;
-    border-radius: 12px;
-    border: 1px solid #cbd5e1;
-    background: #f8fafc;
-    font-size: 12px;
-    font-weight: 600;
-    color: #334155;
-    outline: none;
-    cursor: pointer;
-    transition: all 0.15s ease;
+.webdokan-active-device-info {
+    display: flex !important;
+    align-items: center !important;
+    gap: 7px !important;
+    font-size: 13px !important;
 }
 
-.webdokan-select-wrap select:focus {
-    border-color: #059669;
-    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
-    background: #ffffff;
+.webdokan-pulse-dot {
+    width: 8px !important;
+    height: 8px !important;
+    background: #10b981 !important;
+    border-radius: 50% !important;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2) !important;
+    display: inline-block !important;
+    flex-shrink: 0 !important;
 }
 
-.webdokan-select-wrap select:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.webdokan-active-device-title {
+    font-weight: 600 !important;
+    color: #64748b !important;
+    font-size: 12px !important;
 }
 
-/* ==========================================================================
-   EXACT SPLIT-PILL CAPSULE BADGE (From UI Screenshot)
+.webdokan-current-device-name {
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    font-size: 13px !important;
+}
+
+.webdokan-toggle-search-btn {
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #0f172a !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    padding: 4px 12px !important;
+    border-radius: 9999px !important;
+    transition: all 0.15s ease !important;
+    line-height: 1.4 !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+}
+
+.webdokan-toggle-search-btn:hover {
+    border-color: #059669 !important;
+    color: #059669 !important;
+    background: #f0fdf4 !important;
+}
+
+/* Quick Chips Row */
+.webdokan-quick-chips-row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin-top: 10px !important;
+    flex-wrap: wrap !important;
+}
+
+.webdokan-chip-label {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    color: #94a3b8 !important;
+    margin-right: 2px !important;
+}
+
+.webdokan-quick-chip {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    padding: 3px 9px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: #475569 !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+    line-height: 1.3 !important;
+}
+
+.webdokan-quick-chip:hover {
+    border-color: #94a3b8 !important;
+    color: #0f172a !important;
+    background: #f1f5f9 !important;
+}
+
+.webdokan-quick-chip.active {
+    background: #0f172a !important;
+    color: #ffffff !important;
+    border-color: #0f172a !important;
+}
+
+/* Expandable Autocomplete Search Bar */
+.webdokan-search-expand-wrap {
+    position: relative !important;
+    margin-top: 10px !important;
+}
+
+.webdokan-search-input-box {
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+}
+
+.webdokan-search-icon {
+    position: absolute !important;
+    left: 12px !important;
+    color: #94a3b8 !important;
+    pointer-events: none !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+.webdokan-device-search-input {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 40px !important;
+    padding: 0 34px 0 36px !important;
+    border-radius: 12px !important;
+    border: 1.5px solid #cbd5e1 !important;
+    background: #ffffff !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: #0f172a !important;
+    outline: none !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
+}
+
+.webdokan-device-search-input:focus {
+    border-color: #059669 !important;
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15) !important;
+}
+
+.webdokan-search-clear-btn {
+    position: absolute !important;
+    right: 10px !important;
+    background: none !important;
+    border: none !important;
+    color: #94a3b8 !important;
+    cursor: pointer !important;
+    font-size: 13px !important;
+    padding: 2px !important;
+    border-radius: 50% !important;
+    line-height: 1 !important;
+}
+
+.webdokan-search-clear-btn:hover {
+    color: #0f172a !important;
+}
+
+/* Suggestions Dropdown */
+.webdokan-suggestions-list {
+    position: absolute !important;
+    top: calc(100% + 4px) !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 14px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
+    max-height: 240px !important;
+    overflow-y: auto !important;
+    z-index: 9999 !important;
+    padding: 4px !important;
+    animation: webdokanFadeIn 0.18s ease-out !important;
+}
+
+.webdokan-suggestion-item {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 8px 10px !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+    gap: 8px !important;
+}
+
+.webdokan-suggestion-item:hover,
+.webdokan-suggestion-item.active {
+    background: #f1f5f9 !important;
+}
+
+.webdokan-suggestion-info {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    overflow: hidden !important;
+}
+
+.webdokan-suggestion-brand {
+    font-size: 9px !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    background: #e2e8f0 !important;
+    color: #475569 !important;
+    padding: 2px 5px !important;
+    border-radius: 5px !important;
+    white-space: nowrap !important;
+}
+
+.webdokan-suggestion-name {
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis !important;
+    overflow: hidden !important;
+}
+
+.webdokan-suggestion-sku {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    color: #64748b !important;
+    font-family: monospace !important;
+    white-space: nowrap !important;
+}
+
+/* Score Iframe Container */
+.webdokan-iframe-wrapper {
+    position: relative !important;
+    width: 100% !important;
+    min-height: 580px !important;
+    margin-bottom: 10px !important;
+    border-radius: 22px !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+}
+
+.webdokan-score-iframe {
+    width: 100% !important;
+    height: 580px !important;
+    border: none !important;
+    display: block !important;
+    margin: 0 auto !important;
+    border-radius: 22px !important;
+    transition: opacity 0.2s ease !important;
+}
+
+@keyframes webdokanFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
    ========================================================================== */
 
 .webdokan-badge-container {
