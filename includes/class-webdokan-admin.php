@@ -75,7 +75,7 @@ if (!class_exists('WebDokan_Compat_Admin')) {
                            id="_webdokan_wdp_id" 
                            value="<?php echo esc_attr($wdp_id); ?>" 
                            placeholder="e.g. WDP90950" />
-                    <button type="button" class="button button-secondary" id="webdokan-verify-btn">
+                    <button type="button" class="button button-secondary" id="webdokan-verify-btn" onclick="if(window.webdokanVerifyWdp){window.webdokanVerifyWdp(event);}">
                         <?php esc_html_e('Verify WDP ID', 'webdokan-device-compatibility-fit-for-woocommerce'); ?>
                     </button>
                 </span>
@@ -89,6 +89,39 @@ if (!class_exists('WebDokan_Compat_Admin')) {
             </p>
             <div id="webdokan-verify-result" style="margin: 8px 12px 16px 12px; display: none;"></div>
         </div>
+        <script>
+        window.webdokanVerifyWdp = window.webdokanVerifyWdp || function(e) {
+            if(e && e.preventDefault) e.preventDefault();
+            var $btn = jQuery('#webdokan-verify-btn');
+            var $wdpInput = jQuery('#_webdokan_wdp_id');
+            var $resultBox = jQuery('#webdokan-verify-result');
+            var wdpId = jQuery.trim($wdpInput.val());
+            if(!wdpId) { alert('Please enter a WebDokan Product ID (e.g. WDP90950)'); $wdpInput.focus(); return; }
+            $btn.prop('disabled', true).text('Verifying...');
+            $resultBox.show().html('<div style="color: #64748b; font-size: 12px; padding: 6px 0;">⏳ Connecting to WebDokan Cloud Engine...</div>');
+            var ajaxUrl = (window.webdokanAdmin && window.webdokanAdmin.ajaxUrl) ? window.webdokanAdmin.ajaxUrl : (typeof ajaxurl !== 'undefined' ? ajaxurl : '/wp-admin/admin-ajax.php');
+            var nonce = (window.webdokanAdmin && window.webdokanAdmin.nonce) ? window.webdokanAdmin.nonce : '<?php echo esc_js(wp_create_nonce('webdokan_admin_nonce')); ?>';
+            jQuery.ajax({
+                url: ajaxUrl,
+                type: 'POST',
+                data: { action: 'webdokan_verify_wdp', security: nonce, wdp_id: wdpId },
+                success: function(res) {
+                    $btn.prop('disabled', false).text('Verify WDP ID');
+                    if(res.success && res.data) {
+                        var d = res.data;
+                        $resultBox.html('<div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #166534; display: flex; align-items: center; justify-content: space-between; gap: 10px;"><div><strong>✅ Verified WebDokan Profile:</strong> ' + (d.name || d.wdp_id) + '<div style="margin-top: 2px; color: #15803d; font-size: 11px;">Category: <strong>' + (d.category || 'Mobile Accessory') + '</strong> ' + (d.maxWattage ? ' • Max Wattage: <strong>' + d.maxWattage + 'W</strong>' : '') + '</div></div><a href="' + (d.verifiedUrl || '#') + '" target="_blank" class="button button-small" style="font-size: 11px; white-space: nowrap;">View Specs ↗</a></div>');
+                    } else {
+                        var errMsg = res.data ? res.data.message : 'Product not found in certified catalog.';
+                        $resultBox.html('<div style="background: #fef2f2; border: 1px solid #fca5a5; border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #991b1b;">❌ ' + errMsg + '</div>');
+                    }
+                },
+                error: function() {
+                    $btn.prop('disabled', false).text('Verify WDP ID');
+                    $resultBox.html('<div style="background: #fef2f2; border: 1px solid #fca5a5; border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #991b1b;">❌ Server communication failed. Check your connection.</div>');
+                }
+            });
+        };
+        </script>
         <?php
     }
 
@@ -429,11 +462,11 @@ if (!class_exists('WebDokan_Compat_Admin')) {
                                 <div style="display: flex; gap: 8px; align-items: center; max-width: 580px; flex-wrap: wrap;">
                                     <div style="position: relative; flex: 1; min-width: 260px;">
                                         <input name="webdokan_api_key" type="password" id="webdokan_api_key" value="<?php echo esc_attr($api_key); ?>" class="regular-text" style="width: 100%; border-radius: 8px; font-family: monospace; padding-right: 36px;" placeholder="wdk_live_..." required />
-                                        <button type="button" id="webdokan-toggle-key-visibility" title="Show/Hide Key" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #64748b; font-size: 14px; padding: 4px;">
+                                        <button type="button" id="webdokan-toggle-key-visibility" onclick="if(window.webdokanToggleKeyVisibility){window.webdokanToggleKeyVisibility(event);}" title="Show/Hide Key" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #64748b; font-size: 14px; padding: 4px;">
                                             👁️
                                         </button>
                                     </div>
-                                    <button type="button" class="button button-secondary" id="webdokan-test-api-key-btn" style="border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                                    <button type="button" class="button button-secondary" id="webdokan-test-api-key-btn" onclick="if(window.webdokanTestApiKey){window.webdokanTestApiKey(event);}" style="border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
                                         ⚡ Test API Key
                                     </button>
                                 </div>
@@ -494,7 +527,64 @@ if (!class_exists('WebDokan_Compat_Admin')) {
             </div>
 
         </div>
+        <script>
+        window.webdokanToggleKeyVisibility = window.webdokanToggleKeyVisibility || function(e) {
+            if(e && e.preventDefault) e.preventDefault();
+            var input = document.getElementById('webdokan_api_key');
+            var btn = document.getElementById('webdokan-toggle-key-visibility');
+            if(input) {
+                if(input.type === 'password') {
+                    input.type = 'text';
+                    if(btn) btn.innerText = '🙈';
+                } else {
+                    input.type = 'password';
+                    if(btn) btn.innerText = '👁️';
+                }
+            }
+        };
+
+        window.webdokanTestApiKey = window.webdokanTestApiKey || function(e) {
+            if(e && e.preventDefault) e.preventDefault();
+            var $btn = jQuery('#webdokan-test-api-key-btn');
+            var $apiKeyInput = jQuery('#webdokan_api_key');
+            var $keyResultBox = jQuery('#webdokan-api-key-test-result');
+            var keyVal = jQuery.trim($apiKeyInput.val());
+
+            if(!keyVal) {
+                $keyResultBox.show().html('<div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #92400e;">⚠️ Please paste or enter your WebDokan API Key first.</div>');
+                $apiKeyInput.focus();
+                return;
+            }
+
+            $btn.prop('disabled', true).text('Testing...');
+            $keyResultBox.show().html('<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #64748b;">⏳ Validating API key with WebDokan Cloud...</div>');
+
+            var ajaxUrl = (window.webdokanAdmin && window.webdokanAdmin.ajaxUrl) ? window.webdokanAdmin.ajaxUrl : (typeof ajaxurl !== 'undefined' ? ajaxurl : '/wp-admin/admin-ajax.php');
+            var nonce = (window.webdokanAdmin && window.webdokanAdmin.nonce) ? window.webdokanAdmin.nonce : '<?php echo esc_js(wp_create_nonce('webdokan_admin_nonce')); ?>';
+
+            jQuery.ajax({
+                url: ajaxUrl,
+                type: 'POST',
+                data: { action: 'webdokan_test_api_key', security: nonce, api_key: keyVal },
+                success: function(res) {
+                    $btn.prop('disabled', false).text('⚡ Test API Key');
+                    if(res.success) {
+                        var msg = (res.data && res.data.message) ? res.data.message : 'API Key is valid and active!';
+                        $keyResultBox.html('<div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #166534; font-weight: 600; line-height: 1.5;">✅ ' + msg + '</div>');
+                    } else {
+                        var errMsg = (res.data && res.data.message) ? res.data.message : 'Invalid API Key. Please verify your key on WebDokan.';
+                        $keyResultBox.html('<div style="background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #991b1b; line-height: 1.5;">❌ ' + errMsg + '</div>');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    $btn.prop('disabled', false).text('⚡ Test API Key');
+                    $keyResultBox.html('<div style="background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #991b1b; line-height: 1.5;">❌ Connection error. Try saving first.</div>');
+                }
+            });
+        };
+        </script>
         <?php
     }
 }
 }
+
