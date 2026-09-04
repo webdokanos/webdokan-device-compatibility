@@ -18,7 +18,7 @@ Customers can select their smartphone brand and model to immediately see if a ch
 
 ---
 
-## ✨ Key Features
+## Key Features
 
 * **100% Certified Lab Accuracy:** Bind products to a certified WebDokan Product ID (`WDP90950`) without fuzzy guessing.
 * **Official Split-Pill Status Badges:** Display certified match tiers (`BEST MATCH`, `HIGHLY COMPATIBLE`, `FUNCTIONAL MATCH`, `INCOMPATIBLE`).
